@@ -1,3 +1,5 @@
+//ESP8266 A12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
+
 #include <SoftwareSerial.h>
 
 SoftwareSerial gsmSerial;
