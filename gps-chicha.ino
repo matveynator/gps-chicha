@@ -1,8 +1,16 @@
-//ESP8266 ESP-12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
-//Battery 3.7v MUST be connected to use GSM/SMS!
+
+
+/*
+   GPS-CHICHA 
+   v0.01: SMS Sending - [DONE].
+
+   ESP8266 ESP-12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
+   Battery 3.7v MUST be connected to use GSM/SMS!
+*/
+
 
 //Use this ESP SoftwareSerial: https://github.com/plerup/espsoftwareserial
-#include <SoftwareSerial.h> 
+#include <SoftwareSerial.h>
 
 SoftwareSerial gsmSerial;
 
@@ -23,8 +31,8 @@ const int WatchdogTimeout = 5000;
 boolean debug = true;
 boolean GSMOperational = false;
 
-randomSeed(analogRead(A9RXPin));
-Int Password = random(9999);
+//randomSeed(analogRead(A9RXPin));
+int Password = random(9999);
 
 String grepValue(String data, char separator, int index)
 {
@@ -157,7 +165,7 @@ void sleep(int sleep_time) {
 
 String ATCommand(String command, const int timeout)
 {
-  
+
   String response = "";   // a String to hold incoming data
   if (debug)
   {
