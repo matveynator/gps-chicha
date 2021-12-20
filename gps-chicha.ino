@@ -1,12 +1,14 @@
-//ESP8266 A12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
+//ESP8266 ESP-12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
+//Battery 3.7v MUST be connected to use GSM/SMS!
 
-#include <SoftwareSerial.h>
+//Use this ESP SoftwareSerial: https://github.com/plerup/espsoftwareserial
+#include <SoftwareSerial.h> 
 
 SoftwareSerial gsmSerial;
 
 String OwnerPhone = "+79991234567";
-//String Password = "34859475";
 String TestMessage = "Privet Chicha! This is the SMS test.";
+
 
 //constants:
 const int A9PowerPin = 16;
@@ -20,6 +22,9 @@ const int WatchdogTimeout = 5000;
 
 boolean debug = true;
 boolean GSMOperational = false;
+
+randomSeed(analogRead(A9RXPin));
+Int Password = random(9999);
 
 String grepValue(String data, char separator, int index)
 {
