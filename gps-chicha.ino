@@ -1,7 +1,7 @@
 
 
 /*
-   GPS-CHICHA 
+   GPS-CHICHA
    v0.01: SMS Sending - [DONE].
 
    ESP8266 ESP-12S A9/A9G with ESPSoftwareSerial messaging via Interrupts, Hardware ESP8266  Watchdog restart.
@@ -11,6 +11,7 @@
 
 //Use this ESP SoftwareSerial: https://github.com/plerup/espsoftwareserial
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 
 SoftwareSerial gsmSerial;
 
@@ -30,6 +31,15 @@ const int WatchdogTimeout = 5000;
 
 boolean debug = true;
 boolean GSMOperational = false;
+
+//ПЗУ
+const int OperationEepromAddress = 1;
+const int SMSOperationEepromAddress = 2;
+const int InitEepromAddress = 3;
+const int MessageNotifyEepromAddress = 4;
+const int SMSEepromAddress = 100;
+const int MessageEepromAddress = 200;
+
 
 //randomSeed(analogRead(A9RXPin));
 int Password = random(9999);
@@ -93,13 +103,13 @@ void A9SwitchOn()
   {
     if (debug)
     {
-      Serial.println("A9/A9G is awailable and operational.");
+      Serial.println("GSM chip is awailable.");
     }
     GSMOperational = true;
   } else {
     if (debug)
     {
-      Serial.println("A9/A9G is NOT awailable and NOT operational.");
+      Serial.println("GSM chip is NOT awailable.");
     }
   }
 
@@ -146,6 +156,92 @@ bool CheckATReplyExists(String Command, String Needle, int Timeout) {
   }
 
 }
+
+
+bool CheckGSMRegisteredOK() {
+  String message = "";
+  message = ATCommand("AT+CREG?", 3000);
+  //BAD: +CREG: 0 || +CREG: 1,0 || +CREG: 1,2 || +CREG: 1,3 || +CREG: 2 || +CREG: 3 || +CREG: 4 || +CREG: 8 || +CREG: 9 || +CREG: 10
+  if ((message.indexOf("+CREG: 0") >= 0) || (message.indexOf("+CREG: 1,0") >= 0) || (message.indexOf("+CREG: 1,2") >= 0) || (message.indexOf("+CREG: 1,3") >= 0)  || (message.indexOf("+CREG: 2") >= 0) || (message.indexOf("+CREG: 3") >= 0) || (message.indexOf("+CREG: 4") >= 0) || (message.indexOf("+CREG: 8") >= 0) || (message.indexOf("+CREG: 9") >= 0) || (message.indexOf("+CREG: 10") >= 0))
+  {
+    if ((message.indexOf("+CREG: 1,0") >= 0) || (message.indexOf("+CREG: 1,2") >= 0)) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: Did you connect 3.7v cable to the GSM board?");
+      }
+    }
+    if (message.indexOf("+CREG: 2") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: Searching for GSM network...");
+      }
+    }
+    if (message.indexOf("+CREG: 1,3") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: No SIM card.");
+      }
+    }
+    if (message.indexOf("+CREG: 3") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: registration denied.");
+      }
+    }
+    if (message.indexOf("+CREG: 4") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: Unknown problem (CODE 4: out of GERAN/UTRAN/E-UTRAN coverage).");
+      }
+    }
+    if (message.indexOf("+CREG: 8") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: emergency services only.");
+      }
+    }
+    if (message.indexOf("+CREG: 9") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: registered for CSFB not preferred, home network.");
+      }
+    }
+    if (message.indexOf("+CREG: 10") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM Problem: registered for CSFB not preferred, roaming network.");
+      }
+    }
+    return false;
+  } else {
+    if (message.indexOf("+CREG: 1,1") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM OK: registered, home network.");
+      }
+    }
+    if (message.indexOf("+CREG: 5") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM OK: registered, roaming.");
+      }
+    }
+    if (message.indexOf("+CREG: 6") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM OK: registered for SMS only, home network");
+      }
+    }
+    if (message.indexOf("+CREG: 7") >= 0) {
+      if (debug)
+      {
+        Serial.println("GSM OK: registered for SMS only, roaming");
+      }
+    }
+    return true;
+  }
+}
+
 
 void sleep(int sleep_time) {
   //non blocking delay(sleep_time);
@@ -198,32 +294,82 @@ String ATCommand(String command, const int timeout)
 void GSMInit() {
   if (!CheckATReplyExists("AT+IPR?", String(A9BaudRate), 3000)) {
     ATCommand("AT+IPR=" + String(A9BaudRate) + "\"", 3000);
-  } else {
+  }
+
+  //disable echo
+  ATCommand("ATE0", 1000);
+  ATCommand("ATV0", 1000);
+
+  //show full cmee errors (2) instead of codes (1)
+  ATCommand("AT+CMEE=2", 1000);
+
+  //Switch text mode in SMS
+  if (!CheckATReplyExists("AT+CMGF?", "+CMGF: 1", 3000)) {
     ATCommand("AT+CMGF=1", 3000);
   }
 
-  if (CheckATReplyExists("AT+CREG?", "+CREG: 0", 3000)) {
-    //+CREG: 0 (not registered and not searching)
+  //Switch CallerID ON "+CLIP:1,1"
+  if (!CheckATReplyExists("AT+CLIP?", "+CLIP:1,1", 3000)) {
+    ATCommand("AT+CLIP=1", 3000);
+  }
+
+  //Switch SMS "GSM" encoding.
+  if (!CheckATReplyExists("AT+CSCS?", "+CSCS: \"GSM\"", 3000)) {
+    ATCommand("AT+CSCS=\"GSM\"", 3000);
+  }
+
+  if (!CheckGSMRegisteredOK()) {
     //reboot now!
     if (debug)
     {
-      Serial.println("+CREG: 0 (not registered and not searching), Restart GSM (reseting / rebooting A9G chip)...");
+      Serial.println("Restarting GSM (reseting / rebooting A9G chip)...");
     }
     //Restart GSM (reset / reboot A9G chip):
     SoftResetA9();
-  } else {
-    if (debug)
-    {
-      Serial.println("//normal - wait until receive  +CREG: 1.1 or +CREG: 6,1 or ...");
-    }
   }
-
 }
 
 void SoftResetA9() {
-  digitalWrite(A9ResetPin, HIGH);
-  sleep(1000);
+
+  //Power down AT command:
+  //ATCommand("AT+CPOWD=0", 3000);
+
+/*
+  if (debug)
+  {
+    Serial.println("GSM: restoring factory defaults...");
+  }
+  //Restore factory defaults:
+  ATCommand("AT&F", 3000);
+  sleep(3000);
+*/
+
+/*
+  if (debug)
+  {
+    Serial.println("GSM: reseting chip...");
+  }
+  //Reset AT command:
+  ATCommand("AT+CFUN=1,1", 3000);
+  sleep(3000);
+*/
+
+  if (debug)
+  {
+    Serial.print("GSM: power cycle...");
+  }
   digitalWrite(A9ResetPin, LOW);
+  digitalWrite(A9LowPowerPin, LOW);
+  digitalWrite(A9PowerPin, LOW);
+  sleep(3000);
+  digitalWrite(A9LowPowerPin, HIGH);
+  digitalWrite(A9PowerPin, HIGH);
+  if (debug)
+  {
+    Serial.println(" [ DONE ]");
+  }
+  //reboot
+  //TriggerWatchdogReset();
 }
 
 void SendSMS(String Phone, String Message) {
@@ -235,7 +381,6 @@ void SendSMS(String Phone, String Message) {
 void setup()
 {
   ESP.wdtDisable();
-  //ESP.wdtEnable(WDTO_8S);
   ESP.wdtEnable(WatchdogTimeout);
   Serial.begin(BaudRate);
   gsmSerial.begin(A9BaudRate, SWSERIAL_8N1, A9RXPin, A9TXPin, false, 256);
@@ -248,9 +393,10 @@ void setup()
   digitalWrite(A9LowPowerPin, HIGH);
   digitalWrite(A9PowerPin, LOW);
 
-  SendSMS(OwnerPhone, TestMessage);
-  //ATCommand("AT+CMGS=\"+79288195014\"\r Test from at command\n \x1a", 5000, debug);
-  //sleep(5000);
+
+  A9SwitchOn();
+  GSMInit();
+  //SendSMS(OwnerPhone, TestMessage);
 
 
   //ATCommand("AT+CGATT=1", 3000, DEBUG);
@@ -264,6 +410,15 @@ void setup()
   //ATCommand(cmdString, 5000, DEBUG);
 }
 
+
+void TriggerWatchdogReset() {
+  if (debug)
+  {
+    Serial.print("Initiating hardware watchdog reboot...");
+  }
+  while (true) {
+  }
+}
 
 void loop()
 {
