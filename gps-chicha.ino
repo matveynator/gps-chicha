@@ -11,7 +11,7 @@
 
 //Use this ESP SoftwareSerial: https://github.com/plerup/espsoftwareserial
 #include <SoftwareSerial.h>
-#include <EEPROM.h>
+//#include <EEPROM.h>
 
 SoftwareSerial gsmSerial;
 
@@ -99,7 +99,7 @@ void A9SwitchOn()
 
   String message = "";
   message = ATCommand("AT", 1000);
-  if (message.indexOf("OK") >= 0)
+  if ((message.indexOf("OK") >= 0) || (message.indexOf("0") >= 0))
   {
     if (debug)
     {
@@ -127,7 +127,7 @@ void A9SwitchOn()
       sleep(100);
 
       message = ATCommand("AT", 1000);
-      if (message.indexOf("OK") >= 0)
+      if ((message.indexOf("OK") >= 0) || (message.indexOf("0") >= 0))
       {
         if (debug)
         {
@@ -291,15 +291,23 @@ String ATCommand(String command, const int timeout)
   }
   return response;
 }
+
+void GetGPSLocation() {
+	ATCommand("AT+LOCATION=2", 3000);
+}
+
 void GSMInit() {
   if (!CheckATReplyExists("AT+IPR?", String(A9BaudRate), 3000)) {
     ATCommand("AT+IPR=" + String(A9BaudRate) + "\"", 3000);
   }
 
+  //full functionality
+  //ATCommand("AT+CFUN=1", 1000);
+
   //disable echo
   ATCommand("ATE0", 1000);
-  ATCommand("ATV0", 1000);
-
+  ATCommand("ATV1", 1000);
+  
   //show full cmee errors (2) instead of codes (1)
   ATCommand("AT+CMEE=2", 1000);
 
@@ -331,29 +339,6 @@ void GSMInit() {
 
 void SoftResetA9() {
 
-  //Power down AT command:
-  //ATCommand("AT+CPOWD=0", 3000);
-
-/*
-  if (debug)
-  {
-    Serial.println("GSM: restoring factory defaults...");
-  }
-  //Restore factory defaults:
-  ATCommand("AT&F", 3000);
-  sleep(3000);
-*/
-
-/*
-  if (debug)
-  {
-    Serial.println("GSM: reseting chip...");
-  }
-  //Reset AT command:
-  ATCommand("AT+CFUN=1,1", 3000);
-  sleep(3000);
-*/
-
   if (debug)
   {
     Serial.print("GSM: power cycle...");
@@ -369,7 +354,7 @@ void SoftResetA9() {
     Serial.println(" [ DONE ]");
   }
   //reboot
-  //TriggerWatchdogReset();
+  TriggerWatchdogReset();
 }
 
 void SendSMS(String Phone, String Message) {
@@ -389,9 +374,11 @@ void setup()
   pinMode(A9ResetPin, OUTPUT);
   pinMode(A9LowPowerPin, OUTPUT);
 
-  digitalWrite(A9ResetPin, LOW);
+  digitalWrite(A9ResetPin, HIGH);
+  sleep(1000);
+   digitalWrite(A9ResetPin, LOW);
   digitalWrite(A9LowPowerPin, HIGH);
-  digitalWrite(A9PowerPin, LOW);
+  digitalWrite(A9PowerPin, HIGH);
 
 
   A9SwitchOn();
@@ -422,6 +409,7 @@ void TriggerWatchdogReset() {
 
 void loop()
 {
+	//GetGPSLocation();
   while (gsmSerial.available() > 0) {
     //RespondToCallOrSMS(IncomingMessage);
     Serial.write(gsmSerial.read());
