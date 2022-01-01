@@ -293,6 +293,7 @@ String ATCommand(String command, const int timeout)
 }
 
 void GetGPSLocation() {
+  //AT+LOCATION=2 - GPS, AT+LOCATION=1 - LBS
 	ATCommand("AT+LOCATION=2", 3000);
 }
 
@@ -302,14 +303,15 @@ void GSMInit() {
   }
 
   //full functionality
-  //ATCommand("AT+CFUN=1", 1000);
+  ATCommand("AT+CFUN=1", 1000);
 
   //disable echo
-  ATCommand("ATE0", 1000);
-  ATCommand("ATV1", 1000);
+  ATCommand("ATE0", 3000);
+	//enable full text result codes (OK codes instead of 0 codes).
+  ATCommand("ATV1", 3000);
   
   //show full cmee errors (2) instead of codes (1)
-  ATCommand("AT+CMEE=2", 1000);
+  ATCommand("AT+CMEE=2", 3000);
 
   //Switch text mode in SMS
   if (!CheckATReplyExists("AT+CMGF?", "+CMGF: 1", 3000)) {
@@ -327,7 +329,9 @@ void GSMInit() {
   }
 
   if (!CheckGSMRegisteredOK()) {
-    //reboot now!
+  	//If GSM not registered - reboot device and try again.
+	  
+		//reboot now!
     if (debug)
     {
       Serial.println("Restarting GSM (reseting / rebooting A9G chip)...");
@@ -358,8 +362,8 @@ void SoftResetA9() {
 }
 
 void SendSMS(String Phone, String Message) {
-  A9SwitchOn();
-  GSMInit();
+  //A9SwitchOn();
+  //GSMInit();
   ATCommand("AT+CMGS=\"" + Phone + "\"\r " + Message + "\n \x1a", 10000);
 }
 
@@ -376,7 +380,7 @@ void setup()
 
   digitalWrite(A9ResetPin, HIGH);
   sleep(1000);
-   digitalWrite(A9ResetPin, LOW);
+  digitalWrite(A9ResetPin, LOW);
   digitalWrite(A9LowPowerPin, HIGH);
   digitalWrite(A9PowerPin, HIGH);
 
@@ -409,7 +413,7 @@ void TriggerWatchdogReset() {
 
 void loop()
 {
-	//GetGPSLocation();
+	GetGPSLocation();
   while (gsmSerial.available() > 0) {
     //RespondToCallOrSMS(IncomingMessage);
     Serial.write(gsmSerial.read());
