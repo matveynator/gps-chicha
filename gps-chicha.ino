@@ -293,7 +293,8 @@ String ATCommand(String command, const int timeout)
 }
 
 void GetGPSLocation() {
-  //AT+LOCATION=2 - GPS, AT+LOCATION=1 - LBS
+  //GPS:  AT+LOCATION=2
+  //GSM LBS: AT+LOCATION=1
 	ATCommand("AT+LOCATION=2", 3000);
 }
 
